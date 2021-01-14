@@ -1,168 +1,27 @@
-# Docker環境の作り方
+# Predict Future Sales
+[Kaggle Page](https://www.kaggle.com/c/competitive-data-science-predict-future-sales/overview)
 
+This challenge serves as final project for the "How to win a data science competition" Coursera course.
+In this competition you will work with a challenging time-series dataset consisting of daily sales data, kindly provided by one of the largest Russian software firms - 1C Company. 
+We are asking you to predict total sales for every product and store in the next month. By solving this competition you will be able to apply and enhance your data science skills.
 
-## 1. clone
-```
-mkdir -p ~/dev/projects
-cd ~/dev/projects
-git clone git@gitlab.datumstudio.jp:k.masuda/kaggle_titanic.git
-```
-
-## 2. docker-compose.ymlを編集
-
-```
-version: "2"
-services:
-  kaggle_titanic: #1
-    container_name: kaggle_titanic  #2
-    image: keitadev/kaggle_titanic:latest #3
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8003:8888"  #4
-      - "10003:22"   #5
-    volumes:         #6 
-      - "~/dev/projects/vinx:/home/jovyan/dev/projects/vinx"
-```
-
-好きなように変更してほしいところ
-* \#1 `サービス名`
-* \#2 `container_name`
-* \#3 `image`
-* \#4&\#5 `ports`
-  * ここはコロンの左側の数字のみ、コロンの右側の数字は変更しないこと
-* \#6 `volumes` ローカルマシンとVMの共有ディレクトリ(:の左がローカル)
-
-## 3. コンテナ起動
-
-`docker-compose up -d`
-
-## 4. 念のため確認
-```
-docker ps
-
-[keita.masuda@RM0214 ~/test/kaggle_titanic]$ docker ps
-CONTAINER ID        IMAGE                            COMMAND                  CREATED             STATUS              PORTS                                           NAMES
-bc77fafbd64d        keitadev/kaggle_titanic:latest   "tini -g -- /start.sh"   2 minutes ago       Up 2 minutes        0.0.0.0:10009->22/tcp, 0.0.0.0:8009->8888/tcp   kaggle_titanic
-```
-
-## 4. Jupiterを確認
-
-http://localhost:10003
-
-10003は↑で設定したポート番号
-
-パスワードはroot
-
-## 5. コンテナにログインできるか確認
-`docker exec -it [Container ID] /bin/bash`  
-
-Or
-  
-```
-$ ssh -p 10009 jovyan@localhost 
-
-The authenticity of host '[localhost]:10009 ([::1]:10009)' can't be established.
-ECDSA key fingerprint is SHA256:XxaXvQp50rAhXnRxPnPEtUT4cch1SX9ivhskZga2n5E.
-
-Are you sure you want to continue connecting (yes/no)? yes
-Warning: Permanently added '[localhost]:10009' (ECDSA) to the list of known hosts.
-
-jovyan@localhost's password: jovyan
-
-jovyan@bc77fafbd64d:~$ ログイン成功
-```
-10009は↑で設定したポート番号
-
-# カスタムライブラリをAzure環境でimportし、実行する方法
-
-ここではAzure環境に自作ライブラリを転送し、AzureMLが作るDocker環境にインストールし、Pipeline Script内でimportおよび実行する方法をまとめる。
-
-## 1. スクリプトの追加/変更
-
-以下にスクリプトファイルを作る、もしくは以下にある既存スクリプトを変更する。  
-`/home/jovyan/dev/projects/vinx/work/lib/vinx_azure/vinx_azure_ml`
-
-## 2. バージョンの変更
-
-`/home/jovyan/dev/projects/vinx/work/lib/vinx_azure/setup.py`のバージョンを変更する。
-
-```
-import setuptools
-
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
-setuptools.setup(
-    name="vinx_azure_ml",
-    version="0.0.4",  <------------------------------HERE!
-    author="Keita Masuda",
-    author_email="k.masuda@datumstudio.jp",
-    description="A custom package used in model development in Azure ML",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    packages=setuptools.find_packages(),
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-    ],
-    python_requires='>=3.6',
-)
-```
-
-## 3. `azureml` Conda環境のアクティベーション
-
-ローカルのvinx Docker環境内に入り、`azureml` conda環境をアクティベートする。  
-
-`source activate azureml`
-
-念の為pythonのバージョンを確認  
-
-```
-$python --version
-Python 3.6.10 :: Anaconda, Inc.
-```
-3.6以上なはず
-
-## 4. wheelファイルの作成
-
-wheelファイルを作成
-
-`cd /home/jovyan/dev/projects/vinx/work/lib/vinx_azure`  
-`python setup.py sdist bdist_wheel`
-
-以下のディレクトリに`.whl`ファイルが↑で書き換えたバージョン番号で存在するか確認  
-`/home/jovyan/dev/projects/vinx/work/lib/vinx_azure/dist`
-
-* `work/lib/vinx_azure/dist/vinx_azure_ml-0.0.1-py3-none-any.whl`
-
-`0.0.1` -> バージョン  
-`py3` -> python3
-
-合ってるか確認。  
-
-## 5. 最後に`defs.py`のwheelファイルのパスを書き換えて実行
-
-以下の定数を↑で作成したファイルパスにすればOK
-`WHL_VINX_AZURE_ML= LIB+'/vinx_azure/dist/vinx_azure_ml-0.0.4-py3-none-any.whl'`
-
-これでPipelineのPythonScript内でカスタムモジュールが使えます。
-※ Docker Imageが再生成されます。  
-  
-# sequential_run.pyの実行方法
-sshでdockerコンテナにrootでログイン
-
-`source activate azureml`を実行してazuremlの環境に入る
-
-念のためにpythonのバージョンを確認
-```
-$python --version
-Python 3.6.10 :: Anaconda, Inc.
-```
-と表示されていればok
-
-`cd /home/jovyan/dev/projects/vinx/work/lib`
-したのち
-`python sequential_run.py`を実行すればconfig内にあるsequential_run_config.jsonを読み込み実行可能
+You are provided with daily historical sales data. The task is to forecast the total amount of products sold in every shop for the test set. Note that the list of shops and products slightly changes every month. Creating a robust model that can handle such situations is part of the challenge.
+#### File descriptions
+- sales_train.csv - the training set. Daily historical data from January 2013 to October 2015.
+- test.csv - the test set. You need to forecast the sales for these shops and products for November 2015.
+- sample_submission.csv - a sample submission file in the correct format.
+- items.csv - supplemental information about the items/products.
+- item_categories.csv  - supplemental information about the items categories.
+- shops.csv- supplemental information about the shops.
+#### Data fields
+- ID - an Id that represents a (Shop, Item) tuple within the test set
+- shop_id - unique identifier of a shop
+- item_id - unique identifier of a product
+- item_category_id - unique identifier of item category
+- item_cnt_day - number of products sold. You are predicting a monthly amount of this measure
+- item_price - current price of an item
+- date - date in format dd/mm/yyyy
+- date_block_num - a consecutive month number, used for convenience. January 2013 is 0, February 2013 is 1,..., October 2015 is 33
+- item_name - name of item
+- shop_name - name of shop
+- item_category_name - name of item category
