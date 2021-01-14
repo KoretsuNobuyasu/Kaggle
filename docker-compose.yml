@@ -1,0 +1,13 @@
+version: "3"
+services:
+  kaggle:
+    container_name: kaggle
+    image: nobudev/kaggle:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8888"
+      - "10005:22"
+    volumes:
+      - "~/GitHub/Kaggle:/home/dev/projects/kaggle"
